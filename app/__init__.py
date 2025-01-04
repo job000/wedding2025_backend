@@ -1,9 +1,10 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from flasgger import Swagger
+import os
 
 db = SQLAlchemy()
 migrate = Migrate()
@@ -423,4 +424,28 @@ def create_app():
     app.register_blueprint(info_bp)
     app.register_blueprint(faq_bp)
 
-    return app
+    # Konfigurer opplastingsmappe  <-- LEGG TIL HER
+    UPLOAD_FOLDER = os.path.join(os.getcwd(), 'uploads')
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+    app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+    # Legg til rute for å servere opplastede filer
+    @app.route('/uploads/<path:filename>')
+    def serve_upload(filename):
+        """
+        Serve uploaded files
+        ---
+        parameters:
+          - name: filename
+            in: path
+            type: string
+            required: true
+        responses:
+          200:
+            description: Return the requested file
+          404:
+            description: File not found
+        """
+        return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+    return app 

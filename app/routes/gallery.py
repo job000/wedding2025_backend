@@ -84,6 +84,17 @@ def upload_media():
     if media_type not in [t.name for t in MediaType]:
         return jsonify({"message": f"Invalid media type. Must be one of: {[t.name for t in MediaType]}"}), 400
 
+    upload_dir = os.path.join(os.getcwd(), 'uploads')
+    os.makedirs(upload_dir, exist_ok=True)
+    
+    # Lagre filen
+    file_path = os.path.join(upload_dir, filename)
+    file.save(file_path)
+    
+    # Generer URL til filen
+    base_url = request.host_url  # Base URL til applikasjonen
+    file_url = f"{base_url}uploads/{filename}"
+
     media = GalleryMedia(
         title=request.form.get('title'),
         description=request.form.get('description'),
@@ -96,11 +107,6 @@ def upload_media():
         tags=request.form.getlist('tags')
     )
 
-    # Opprett uploads-mappe hvis den ikke eksisterer
-    upload_dir = os.path.join(os.getcwd(), 'uploads')
-    os.makedirs(upload_dir, exist_ok=True)
-    file.save(os.path.join(upload_dir, filename))
-
     db.session.add(media)
     db.session.commit()
 
@@ -110,6 +116,7 @@ def upload_media():
             "id": media.id,
             "title": media.title,
             "filename": media.filename,
+            "url": file_url,  # Legger til URL
             "media_type": media.media_type.value,
             "uploaded_by": media.uploaded_by,
             "upload_time": media.upload_time.isoformat(),
@@ -119,9 +126,88 @@ def upload_media():
         }
     }), 201
 
+
 @gallery_bp.route('/media', methods=['GET'])
 @jwt_required(optional=True)
 def get_gallery():
+    """
+    Get all accessible media
+    ---
+    tags:
+      - Gallery
+    parameters:
+      - name: type
+        in: query
+        type: string
+        enum: [image, video, text]
+        description: Filter by media type
+      - name: visibility
+        in: query
+        type: string
+        enum: [public, private]
+        description: Filter by visibility
+      - name: tags
+        in: query
+        type: array
+        items:
+          type: string
+        description: Filter by tags
+    responses:
+      200:
+        description: List of accessible media
+    """
+    user_identity = get_jwt_identity()
+    claims = get_jwt() if user_identity else None
+
+    query = GalleryMedia.query
+
+    # Filtrer basert på brukerens tilgang
+    if not claims or claims.get('role') != 'admin':
+        if user_identity:
+            # Vis public og egne private medier
+            query = query.filter(
+                (GalleryMedia.visibility == "public") | 
+                (GalleryMedia.uploaded_by == user_identity)
+            )
+        else:
+            # Vis kun public medier for ikke-innloggede brukere
+            query = query.filter(GalleryMedia.visibility == "public")
+
+    # Filtrer på media type
+    media_type = request.args.get('type')
+    if media_type:
+        query = query.filter(GalleryMedia.media_type == MediaType[media_type.upper()])
+
+    # Filtrer på tags
+    tags = request.args.getlist('tags')
+    if tags:
+        for tag in tags:
+            query = query.filter(GalleryMedia.tags.contains([tag]))
+
+    # Generer URL-er og returner data
+    media = query.all()
+    return jsonify([{
+        "id": m.id,
+        "title": m.title,
+        "filename": m.filename,
+        "url": f"{request.host_url}uploads/{m.filename}",
+        "media_type": m.media_type.value,
+        "uploaded_by": m.uploaded_by,
+        "upload_time": m.upload_time.isoformat(),
+        "description": m.description,
+        "tags": m.tags,
+        "visibility": m.visibility,
+        "likes": m.likes,
+        "comments": [{
+            "id": c.id,
+            "comment": c.comment,
+            "user": c.user.username,
+            "created_at": c.created_at.isoformat(),
+            "updated_at": c.updated_at.isoformat() if c.updated_at else None
+        } for c in m.comments],
+        "comment_count": len(m.comments)
+    } for m in media])
+
     """
     Get all accessible media
     ---
