@@ -1,0 +1,29 @@
+services:
+  # Backend Web Service
+  - type: web
+    name: wedding-api
+    env: python
+    buildCommand: ./build_script.sh
+    startCommand: gunicorn run:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.9.0
+      - key: DATABASE_URL
+        value: postgresql://wedding2025_db_user:vyYE5tQ6AX8wZ7Yz4WcTsT9VfcdHpx1z@dpg-ctu8901u0jms73f52hs0-a.oregon-postgres.render.com/wedding2025_db
+      - key: FLASK_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true
+
+  # Frontend Static Site
+  - type: web
+    name: wedding-frontend
+    env: static
+    buildCommand: flutter build web
+    staticPublishPath: ./build/web
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
