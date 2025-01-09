@@ -450,6 +450,8 @@ def create_app():
           404:
             description: File not found
         """
-        return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+        response = send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        return response
 
     return app 
