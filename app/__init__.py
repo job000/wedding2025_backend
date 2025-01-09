@@ -451,7 +451,9 @@ def create_app():
             description: File not found
         """
         response = send_from_directory(app.config['UPLOAD_FOLDER'], filename)
-        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Origin"] = "https://fridaandjohnmichaelwedding.onrender.com"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
         return response
 
     return app 
